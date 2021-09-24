@@ -3,6 +3,7 @@ import Data.Fixed
 import Data.Maybe (catMaybes)
 import Data.Char (toLower)
 import Data.List (isPrefixOf)
+import Data.Maybe (fromMaybe)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Debug.Trace (trace, traceShow)
@@ -157,8 +158,8 @@ sunTime longitude latitude (year, month, day) zenith isRising =
         tLocal = fmap (localMeanTime (rightAscHours l) t) h
       in fmap (Main.utc longHour) tLocal
 
-sunset  (year, month, day) longitude latitude = sunTime longitude latitude (year, month, day) zenOfficial False
-sunrise (year, month, day) longitude latitude = sunTime longitude latitude (year, month, day) zenOfficial True
+sunset  (year, month, day) (longitude, latitude) = sunTime longitude latitude (year, month, day) zenOfficial False
+sunrise (year, month, day) (longitude, latitude) = sunTime longitude latitude (year, month, day) zenOfficial True
 
 today :: IO (Int, Int, Int)
 today = fmap (\(a, b, c) -> (fromInteger a, b, c)) $ fmap (toGregorian.utctDay) getCurrentTime 
@@ -170,7 +171,7 @@ toHoursMinutes :: Double -> Int -> (Int, Int)
 toHoursMinutes time' offset = 
     let time = time' + (fromIntegral offset / 60.0)
         hours = floor time 
-        minutes = round $ 60 * (time - fromIntegral hours)
+        minutes = floor $ 60 * (time - fromIntegral hours)
      in (hours, minutes)
 
 showHoursMins :: (Int, Int) -> String
@@ -179,37 +180,30 @@ showHoursMins (hour, minutes) = (show hour) ++ ":" ++ (show minutes)
 sunTimeToString :: Int -> Double -> String
 sunTimeToString offsetMinutes timeHours = showHoursMins $ ((flip toHoursMinutes)offsetMinutes) $ timeHours 
 
+printSuntimeLine :: String -> (Int, Int, Int) -> (Double, Double) -> Int -> IO ()
+printSuntimeLine location date loc utcOffset = do 
+    putStr location >> putStr " "
+    sunriseString <- return $ fmap (sunTimeToString utcOffset) $ sunrise date loc
+    sunsetString <- return $ fmap (sunTimeToString utcOffset) $ sunset date loc
+    putStr $ fromMaybe "No sunrise" sunriseString 
+    putStr " -> "
+    putStrLn $ fromMaybe "No sunrise" sunsetString 
+
 main :: IO ()
 main = do
     args <- getArgs
     fileLocations <- loadLocationsFromFile
     locationLookup <- return $ fileLocations >>= (\locations -> safeHead args >>= (flip searchMap) locations)
+    date <- today 
+    utcOffset <- currentUtcOfset
     case locationLookup of 
-        Just (locationName, (long, lat)) -> do 
-            putStr locationName
-            putStr " "
-            date <- today 
-            utcOfset <- currentUtcOfset
-            sunriseTime <- return $ sunTime long lat date zenOfficial True
-            sunriseString <- return $ fmap (sunTimeToString utcOfset) sunriseTime
-            sunsetime <- return $ sunTime long lat date zenOfficial False
-            sunsetString <- return $ fmap (sunTimeToString utcOfset) sunsetime
-
-            putStr $ case sunriseString of 
-                Just x -> x
-                Nothing -> "No sunrise"
-            putStr " -> "
-            putStrLn $ case sunsetString of 
-                Just x -> x
-                Nothing -> "No sunset"
+        Just (locationName, loc) -> do 
+            printSuntimeLine locationName date loc utcOffset
         Nothing -> do 
-            putStrLn "Location not found"
+            case fileLocations of 
+                Just locations -> mapM_ (\(name, loc) -> printSuntimeLine name date loc utcOffset) $ Map.toList locations
+                Nothing -> return ()
 
 traceN :: Show a => [a] -> b -> b 
 traceN [] def = def
 traceN (x:xs) def = traceN (traceShow x xs) def
-
--- Debug use only
-force :: Maybe a -> a 
-force (Just x) = x
-force (Nothing) = error "force Nothing"
