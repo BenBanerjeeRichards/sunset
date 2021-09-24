@@ -174,8 +174,14 @@ toHoursMinutes time' offset =
         minutes = floor $ 60 * (time - fromIntegral hours)
      in (hours, minutes)
 
+padTimeDigit :: Int -> String 
+padTimeDigit n = 
+    if n > 10 
+        then show n
+        else "0" ++ show n
+
 showHoursMins :: (Int, Int) -> String
-showHoursMins (hour, minutes) = (show hour) ++ ":" ++ (show minutes)
+showHoursMins (hour, minutes) = (padTimeDigit hour) ++ ":" ++ (padTimeDigit minutes)
     
 sunTimeToString :: Int -> Double -> String
 sunTimeToString offsetMinutes timeHours = showHoursMins $ ((flip toHoursMinutes)offsetMinutes) $ timeHours 
