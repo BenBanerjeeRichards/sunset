@@ -1,4 +1,4 @@
-# Sunset and Sunrise calculator 
+# Sunset and sunrise calculator 
 
 Create a file ~/locations.txt containing the longitude & latitude for all places you're interested in 
 
